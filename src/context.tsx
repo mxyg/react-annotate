@@ -10,6 +10,8 @@ import type { AnnotateAdapter, AnnotateMode, AnnotationPin, AssignableUser } fro
 interface AnnotateContextValue {
   adapter: AnnotateAdapter;
   mode: AnnotateMode;
+  /** 是否采集 DOM 片段与源码位置 */
+  collectSource: boolean;
   pins: AnnotationPin[];
   assignees: AssignableUser[];
   refresh: () => void;
@@ -28,10 +30,16 @@ export interface AnnotateProviderProps {
   adapter: AnnotateAdapter;
   /** full=内部标注（可指派/优先级/截止），feedback=用户反馈（只填问题） */
   mode?: AnnotateMode;
+  /**
+   * 是否把 DOM 片段与源码位置一并存进卡片，默认 true。
+   * 源码位置只有 React 开发构建才有（`_debugSource`），生产构建本就取不到；
+   * 对外发布的站点建议显式关掉，连内部文件路径也不写进反馈库。
+   */
+  collectSource?: boolean;
   children?: React.ReactNode;
 }
 
-export const AnnotateProvider: React.FC<AnnotateProviderProps> = ({ adapter, mode = 'full', children }) => {
+export const AnnotateProvider: React.FC<AnnotateProviderProps> = ({ adapter, mode = 'full', collectSource = true, children }) => {
   const [pins, setPins] = useState<AnnotationPin[]>([]);
   const [assignees, setAssignees] = useState<AssignableUser[]>([]);
   // 路由变化要重新拉本页标注；不假设宿主用哪个路由库，直接监听 history 与 popstate
@@ -84,8 +92,8 @@ export const AnnotateProvider: React.FC<AnnotateProviderProps> = ({ adapter, mod
   const onCreated = useCallback((pin: AnnotationPin) => setPins((prev) => [pin, ...prev]), []);
 
   const value = useMemo(
-    () => ({ adapter, mode, pins, assignees, refresh, onCreated }),
-    [adapter, mode, pins, assignees, refresh, onCreated],
+    () => ({ adapter, mode, collectSource, pins, assignees, refresh, onCreated }),
+    [adapter, mode, collectSource, pins, assignees, refresh, onCreated],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -178,12 +178,17 @@ export function buildRegionAnchor(clip: { x: number; y: number; width: number; h
   };
 }
 
-/** 由点击点与目标元素算出锚点数据 */
-export function buildAnchor(el: Element, clientX: number, clientY: number) {
+/**
+ * 由点击点与目标元素算出锚点数据。
+ *
+ * `collectSource=false` 时不采集 DOM 片段与源码位置：这两项只在开发/内部环境有意义
+ * （源码位置本就只有 React 开发构建才有），对外发布的站点没必要把内部文件路径写进反馈库。
+ */
+export function buildAnchor(el: Element, clientX: number, clientY: number, collectSource = true) {
   const rect = el.getBoundingClientRect();
   const url = `${window.location.pathname}${window.location.search}`;
-  const snippet = htmlSnippet(el);
-  const sourceLoc = reactSourceLoc(el);
+  const snippet = collectSource ? htmlSnippet(el) : '';
+  const sourceLoc = collectSource ? reactSourceLoc(el) : '';
   return {
     url,
     routePattern: toRoutePattern(url),

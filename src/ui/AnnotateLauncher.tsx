@@ -55,7 +55,7 @@ const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
   onCollected,
   showBubbles = true,
 }) => {
-  const { adapter, mode, pins, assignees, onCreated } = useAnnotate();
+  const { adapter, mode, collectSource, pins, assignees, onCreated } = useAnnotate();
   const [stage, setStage] = useState<Stage>('idle');
   const [anchor, setAnchor] = useState<PinAnchor | null>(null);
   const [shot, setShot] = useState<{ url: string; key: string } | null>(null);
@@ -184,6 +184,7 @@ const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
 
       {view === 'picking' && (
         <ElementPicker
+          collectSource={collectSource}
           onPick={onPick}
           onRegion={onRegion}
           onCancel={cleanup}

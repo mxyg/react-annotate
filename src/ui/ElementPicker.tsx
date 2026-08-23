@@ -11,6 +11,8 @@ export interface PickResult extends ReturnType<typeof buildAnchor> {
 }
 
 export interface ElementPickerProps {
+  /** 是否采集 DOM 片段与源码位置（默认采集；对外站点可关掉） */
+  collectSource?: boolean;
   onPick: (result: PickResult) => void;
   /** 拖动框选：截当前框，不使用元素选择器 */
   onRegion?: (clip: CaptureClip) => void;
@@ -20,7 +22,7 @@ export interface ElementPickerProps {
 
 const DRAG_PX = 8;
 
-const ElementPicker: React.FC<ElementPickerProps> = ({ onPick, onRegion, onCancel, tip }) => {
+const ElementPicker: React.FC<ElementPickerProps> = ({ onPick, onRegion, onCancel, tip, collectSource = true }) => {
   const [hover, setHover] = useState<DOMRect | null>(null);
   const [label, setLabel] = useState('');
   const [marquee, setMarquee] = useState<CaptureClip | null>(null);
@@ -73,7 +75,7 @@ const ElementPicker: React.FC<ElementPickerProps> = ({ onPick, onRegion, onCance
       setMarquee(null);
       const el = hitTest(e.clientX, e.clientY);
       if (!el) return;
-      onPick({ ...buildAnchor(el, e.clientX, e.clientY), element: el });
+      onPick({ ...buildAnchor(el, e.clientX, e.clientY, collectSource), element: el });
     },
     [onPick, onRegion],
   );
