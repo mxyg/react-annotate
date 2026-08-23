@@ -63,8 +63,12 @@ const AnnotationBoard: React.FC<AnnotationBoardProps> = ({ pins, onMove, onOpen,
             <span>{col.title}</span>
             <span className="ra-tag">{(grouped[col.key] || []).length}</span>
           </div>
+          {(grouped[col.key] || []).length === 0 && (
+            <div className="ra-board__empty">把卡片拖到这里</div>
+          )}
           {(grouped[col.key] || []).map((pin) => {
             const overdue = pin.dueAt && new Date(pin.dueAt).getTime() < now && pin.status !== 'DONE';
+            const reports = pin.reportCount && pin.reportCount > 1 ? pin.reportCount : 0;
             return (
               <div
                 key={pin.id}
@@ -77,6 +81,11 @@ const AnnotationBoard: React.FC<AnnotationBoardProps> = ({ pins, onMove, onOpen,
                 {pin.shotUrl && <img className="ra-card__thumb" src={pin.shotUrl} alt="" loading="lazy" />}
                 <div className="ra-card__title">
                   #{pin.seq} {pin.title}
+                  {reports > 0 && (
+                    <span className="ra-tag ra-tag--count" title={`同一问题被提交 ${reports} 次`}>
+                      ×{reports}
+                    </span>
+                  )}
                 </div>
                 <div className="ra-card__meta">
                   <span className={`ra-tag ra-tag--${pin.priority}`}>{PRIORITY_TEXT[pin.priority] || pin.priority}</span>

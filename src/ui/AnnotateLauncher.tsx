@@ -9,7 +9,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ElementPicker, { type PickResult } from './ElementPicker';
 import PinComposer from './PinComposer';
 import PinBubbles from './PinBubbles';
-import { captureToBlob } from '../core/capture';
+import { captureToBlob, type CaptureClip, type CaptureOptions } from '../core/capture';
+import { buildRegionAnchor } from '../core/anchor';
 import { useAnnotate } from '../context';
 import type { AnnotationPin, PinAnchor, PinDraft } from '../types';
 
@@ -46,6 +47,7 @@ const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
   const [localShotUrl, setLocalShotUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const objectUrl = useRef<string | null>(null);
+  const lastClip = useRef<CaptureOptions['clip']>('viewport');
 
   const cleanup = useCallback(() => {
     if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
@@ -56,10 +58,11 @@ const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
     setStage('idle');
   }, []);
 
-  /** 截图并上传；失败一律降级为无截图，绝不因为截图挡住标注本身 */
-  const shoot = useCallback(async () => {
+  /** 只截视口或框选，失败降级为无截图 */
+  const shoot = useCallback(async (clip: CaptureOptions['clip'] = lastClip.current) => {
+    lastClip.current = clip;
     setStage('shooting');
-    const blob = await captureToBlob();
+    const blob = await captureToBlob({ clip, scale: 1 });
     if (blob) {
       objectUrl.current = URL.createObjectURL(blob);
       setLocalShotUrl(objectUrl.current);
@@ -76,7 +79,15 @@ const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
     (r: PickResult) => {
       const { element, ...rest } = r;
       setAnchor(rest);
-      void shoot();
+      void shoot('viewport');
+    },
+    [shoot],
+  );
+
+  const onRegion = useCallback(
+    (clip: CaptureClip) => {
+      setAnchor(buildRegionAnchor(clip));
+      void shoot(clip);
     },
     [shoot],
   );
@@ -127,8 +138,9 @@ const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
       {stage === 'picking' && (
         <ElementPicker
           onPick={onPick}
+          onRegion={onRegion}
           onCancel={cleanup}
-          tip={mode === 'feedback' ? '点击有问题的地方 · Esc 取消' : '点击要标注的元素 · Esc 取消'}
+          tip="点击选控件 · 拖动框选截图 · Esc 取消"
         />
       )}
 

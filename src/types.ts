@@ -49,6 +49,13 @@ export interface AnnotationPin extends PinAnchor {
   assigneeName: string;
   contactId?: string | null;
   commentCount?: number;
+  /**
+   * 同一问题被提交的次数。首次为 1；再有人标同一处或同一段反馈，宿主应 +1 而不是再建卡。
+   * 看板在 >1 时显示「×N」。
+   */
+  reportCount?: number;
+  /** 本次提交是否并入了已有卡（createPin 的返回值里带，列表里通常不带） */
+  merged?: boolean;
   createdAt: string;
   updatedAt: string;
 }

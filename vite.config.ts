@@ -1,22 +1,20 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import dts from 'vite-plugin-dts';
-import { resolve } from 'path';
+import { fileURLToPath, URL } from 'node:url';
 
+/** GitHub Pages 项目页：https://mxyg.github.io/react-annotate/ */
 export default defineConfig({
-  plugins: [react(), dts({ include: ['src'], rollupTypes: true })],
+  root: 'demo',
+  base: '/react-annotate/',
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@liuman/react-annotate/style.css': fileURLToPath(new URL('./src/styles.css', import.meta.url)),
+      '@liuman/react-annotate': fileURLToPath(new URL('./src/index.ts', import.meta.url)),
+    },
+  },
   build: {
-    lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
-      name: 'ReactAnnotate',
-      formats: ['es', 'cjs'],
-      fileName: (format) => `react-annotate.${format === 'es' ? 'js' : 'cjs'}`,
-    },
-    rollupOptions: {
-      // snapdom 是可选 peer，动态 import；打成 external 让宿主自己决定装不装
-      external: ['react', 'react-dom', 'react/jsx-runtime', '@zumer/snapdom'],
-      output: { assetFileNames: 'react-annotate.[ext]' },
-    },
-    cssCodeSplit: false,
+    outDir: '../demo-dist',
+    emptyOutDir: true,
   },
 });

@@ -41,6 +41,12 @@
 .ra-layer--pass { pointer-events: none; }
 
 /* 元素吸附高亮：只画边框不挡点击，指针事件由整层承接 */
+.ra-marquee {
+  position: fixed;
+  border: 2px dashed var(--ra-accent);
+  background: var(--ra-accent-soft);
+  pointer-events: none;
+}
 .ra-highlight {
   position: fixed;
   border: 2px solid var(--ra-accent);
@@ -182,8 +188,9 @@
 .ra-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* 看板 */
-.ra-board { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; padding-bottom: 8px; }
-.ra-board__col { flex: 1 1 0; min-width: 240px; background: var(--ra-bg-soft); border-radius: var(--ra-radius); padding: 8px; }
+.ra-board { display: flex; gap: 12px; align-items: stretch; overflow-x: auto; padding-bottom: 8px; }
+.ra-board__col { flex: 1 1 0; min-width: 240px; min-height: 280px; background: var(--ra-bg-soft); border-radius: var(--ra-radius); padding: 8px; }
+.ra-board__empty { color: var(--ra-fg-soft); font-size: 12px; padding: 28px 8px; text-align: center; }
 .ra-board__col--over { outline: 2px dashed var(--ra-accent); }
 .ra-board__head { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px 8px; font-weight: 600; }
 .ra-card {
@@ -198,3 +205,12 @@
 .ra-tag--URGENT { color: #fff; background: var(--ra-danger); border-color: var(--ra-danger); }
 .ra-tag--HIGH { color: var(--ra-danger); border-color: var(--ra-danger); }
 .ra-tag--overdue { color: #fff; background: var(--ra-warn); border-color: var(--ra-warn); }
+.ra-tag--count {
+  margin-left: 6px;
+  vertical-align: middle;
+  color: #fff;
+  background: var(--ra-accent);
+  border-color: var(--ra-accent);
+  font-weight: 600;
+}
+.ra-card__title { display: flex; align-items: flex-start; gap: 4px; flex-wrap: wrap; }

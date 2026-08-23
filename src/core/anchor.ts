@@ -103,6 +103,25 @@ export function toRoutePattern(url: string): string {
     .join('/');
 }
 
+/** 框选截图：没有 DOM 选择器，只记下当时视口与框 */
+export function buildRegionAnchor(clip: { x: number; y: number; width: number; height: number }) {
+  const url = `${window.location.pathname}${window.location.search}`;
+  return {
+    url,
+    routePattern: toRoutePattern(url),
+    selector: '',
+    anchorX: 0.5,
+    anchorY: 0.5,
+    elementLabel: `框选 ${Math.round(clip.width)}×${Math.round(clip.height)}`,
+    viewport: {
+      w: window.innerWidth,
+      h: window.innerHeight,
+      dpr: window.devicePixelRatio || 1,
+      theme: document.documentElement.getAttribute('data-theme') || undefined,
+    },
+  };
+}
+
 /** 由点击点与目标元素算出锚点数据 */
 export function buildAnchor(el: Element, clientX: number, clientY: number) {
   const rect = el.getBoundingClientRect();

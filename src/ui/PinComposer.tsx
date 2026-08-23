@@ -184,6 +184,8 @@ const PinComposer: React.FC<PinComposerProps> = ({
               标注人：{authorName || '当前账号'}
               <br />
               位置：{anchor.routePattern} · {anchor.elementLabel}
+              <br />
+              同一处界面或同一段描述再次提交时，会计入已有卡片的次数，不会再开一张卡。
             </div>
           </div>
           <div className="ra-actions">
