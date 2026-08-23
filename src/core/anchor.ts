@@ -1,0 +1,124 @@
+/**
+ * @文件 anchor.ts
+ * @职责 元素锚点：生成稳定选择器、反查元素、归一化路由模板、生成可读元素描述
+ * @路径 Poincare/src/components/annotate/anchor.ts
+ *
+ * 选择器策略（按稳定性从高到低取用）：
+ *   1. `[data-annotate-id]`  —— 宿主主动标的锚点，改版也不失效，最优先
+ *   2. `#id`                 —— 但要跳过一看就是自动生成的（含长 hash / 随机数）
+ *   3. `tag.稳定类名:nth-of-type(n)` 逐级向上拼，最多 6 级
+ * 不用完整 DOM 路径是因为它对任何一次布局微调都过敏，存下来的锚点两周后全废。
+ */
+
+/** 一看就是构建产物/运行时生成的 id 或 class，拿来做锚点等于没锚 */
+const VOLATILE = /(^|[-_])(\d{4,}|[0-9a-f]{8,})([-_]|$)|^(css|sc|jsx|emotion|ant-motion)[-_]/i;
+
+const isStableToken = (t: string) => !!t && t.length <= 40 && !VOLATILE.test(t);
+
+/** 元素上任意可用的显式锚点标记 */
+const explicitId = (el: Element): string | null => {
+  const v = el.getAttribute('data-annotate-id');
+  return v ? `[data-annotate-id="${CSS.escape(v)}"]` : null;
+};
+
+const nthOfType = (el: Element): number => {
+  let i = 1;
+  let sib = el.previousElementSibling;
+  while (sib) {
+    if (sib.tagName === el.tagName) i += 1;
+    sib = sib.previousElementSibling;
+  }
+  return i;
+};
+
+const segmentFor = (el: Element): string => {
+  const tag = el.tagName.toLowerCase();
+  const cls = Array.from(el.classList).filter(isStableToken).slice(0, 2);
+  const base = cls.length ? `${tag}.${cls.map((c) => CSS.escape(c)).join('.')}` : tag;
+  return `${base}:nth-of-type(${nthOfType(el)})`;
+};
+
+/** 为元素生成选择器；返回值保证在生成时刻能被 document.querySelector 反查到 */
+export function buildSelector(target: Element): string {
+  const marked = target.closest('[data-annotate-id]');
+  if (marked) {
+    const sel = explicitId(marked)!;
+    if (marked === target) return sel;
+    // 元素本身没标记但祖先标了：锚到祖先 + 相对路径，比一路 nth 到 body 稳
+    const rel: string[] = [];
+    let cur: Element | null = target;
+    while (cur && cur !== marked && rel.length < 5) {
+      rel.unshift(segmentFor(cur));
+      cur = cur.parentElement;
+    }
+    return `${sel} ${rel.join(' > ')}`;
+  }
+
+  if (target.id && isStableToken(target.id)) return `#${CSS.escape(target.id)}`;
+
+  const parts: string[] = [];
+  let cur: Element | null = target;
+  while (cur && cur !== document.body && parts.length < 6) {
+    if (cur.id && isStableToken(cur.id)) {
+      parts.unshift(`#${CSS.escape(cur.id)}`);
+      return parts.join(' > ');
+    }
+    parts.unshift(segmentFor(cur));
+    cur = cur.parentElement;
+  }
+  return `body > ${parts.join(' > ')}`;
+}
+
+/** 反查：选择器失效时返回 null，由调用方降级到「只看截图」 */
+export function resolveSelector(selector: string): HTMLElement | null {
+  if (!selector) return null;
+  try {
+    return document.querySelector<HTMLElement>(selector);
+  } catch {
+    return null;
+  }
+}
+
+/** 元素的人话描述：选择器失效后，这是人工找回现场的唯一线索 */
+export function describeElement(el: Element): string {
+  const tag = el.tagName.toLowerCase();
+  const aria = el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder');
+  const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+  const label = aria || text;
+  return label ? `${label.slice(0, 60)}（${tag}）` : tag;
+}
+
+/** 与后端 AnnotationService.toRoutePattern 保持同一套规则：uuid/数字/长 hash 段归一为 :id */
+export function toRoutePattern(url: string): string {
+  const path = (url || '').split('?')[0].split('#')[0];
+  return path
+    .split('/')
+    .map((seg) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg) ||
+      /^\d+$/.test(seg) ||
+      /^[0-9a-f]{16,}$/i.test(seg)
+        ? ':id'
+        : seg,
+    )
+    .join('/');
+}
+
+/** 由点击点与目标元素算出锚点数据 */
+export function buildAnchor(el: Element, clientX: number, clientY: number) {
+  const rect = el.getBoundingClientRect();
+  const url = `${window.location.pathname}${window.location.search}`;
+  return {
+    url,
+    routePattern: toRoutePattern(url),
+    selector: buildSelector(el),
+    anchorX: rect.width ? Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) : 0.5,
+    anchorY: rect.height ? Math.min(1, Math.max(0, (clientY - rect.top) / rect.height)) : 0.5,
+    elementLabel: describeElement(el),
+    viewport: {
+      w: window.innerWidth,
+      h: window.innerHeight,
+      dpr: window.devicePixelRatio || 1,
+      theme: document.documentElement.getAttribute('data-theme') || undefined,
+    },
+  };
+}
