@@ -102,12 +102,41 @@ const key = buildDupKey({
 - **手绘用 SVG 而非 canvas**：图元保持可编辑数据，canvas 一落笔就成像素。
 - **看板不发请求**：数据与持久化全交给宿主，同一个看板能接任意后端。
 
-## 生产环境的源码定位
+## 源码定位（含生产环境）
 
-开发构建能从 React 的 `_debugSource` 拿到 `文件:行号`，生产构建没有——而把源码路径随包发给用户
-本身也不合适。所以锚点里还有一个 `sourceRef`：宿主在**构建期**给 DOM 元素注入不可反解的短 id
-（属性名 `data-sl`），`id → 文件:行:列` 的对照表只留在服务端，由后台解析。
-浏览器里始终只有那串 id，拿不到就什么也不是。
+光有选择器不够用：`div > div:nth-of-type(2) > span` 这种东西没人读得动。开发构建能从 React 的
+`_debugSource` 拿到 `文件:行号`，生产构建没有——而把源码路径随包发给用户本身也不合适。
+
+所以本包提供一个构建插件：给每个 DOM 元素注入 7 位**不可反解**的短 id（属性 `data-sl`），
+锚点里带走的就是这个 `sourceRef`；`id → 文件:行:列` 的对照表交给服务端，由后台解析。
+浏览器里始终只有那串 id，拿不到对照表就什么也不是。
+
+```ts
+// vite.config.ts
+import { createAnnotateSource } from '@liuman/react-annotate/vite';
+
+const annotate = createAnnotateSource({
+  root: __dirname,
+  prefix: 'Web/',
+  version: pkg.version,
+  // 同机部署：后端直接读这份 JSON（默认写在 build-artifacts/，务必在 dist 之外）
+  // 分离部署：再把对照表注入后端源码树，随后端代码包一起发布
+  emitModule: { file: path.resolve(__dirname, '../api/src/annotation/source-map.generated.ts') },
+});
+
+export default defineConfig({
+  plugins: [react({ babel: { plugins: [annotate.babelPlugin] } }), annotate.vitePlugin],
+});
+```
+
+开发期同样注入（默认开），所以本机调试时圈到哪就是哪一行，不用再对着选择器猜。
+
+> ⚠️ **对照表不能进静态托管**。放在 `dist/` 里、或跟着前端一起同步到 OSS/CDN，
+> 等于把整张对照表公开发布，短 id 就白设计了。插件默认写到 `build-artifacts/`，
+> 记得把它排除在部署同步之外。
+>
+> 只读文件系统的部署形态（阿里云函数计算这类）拿不到前端产物目录，用 `emitModule`
+> 把对照表编进后端代码包即可，不需要数据库、也不需要共享盘。
 
 `collectSource={false}` 只关掉可读的 `sourceLoc` 与 DOM 片段，不影响 `sourceRef`。
 

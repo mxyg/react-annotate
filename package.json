@@ -1,6 +1,6 @@
 {
   "name": "@liuman/react-annotate",
-  "version": "0.1.13",
+  "version": "0.2.0",
   "homepage": "https://mxyg.github.io/react-annotate/",
   "description": "In-app visual annotation & kanban for React: pick any element, screenshot it, draw on it, and turn it into an assignable task — without leaving the app",
   "type": "module",
@@ -14,12 +14,18 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./style.css": "./src/styles.css"
+    "./style.css": "./src/styles.css",
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "import": "./dist/vite.mjs",
+      "default": "./dist/vite.mjs"
+    }
   },
   "files": [
     "src",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "dist"
   ],
   "sideEffects": [
     "**/*.css"
@@ -28,7 +34,8 @@
     "type-check": "tsc --noEmit",
     "demo": "vite",
     "demo:build": "vite build",
-    "prepublishOnly": "npm run type-check"
+    "prepublishOnly": "npm run type-check && npm run build:vite-plugin",
+    "build:vite-plugin": "esbuild src/vite/annotate-source.ts --outfile=dist/vite.mjs --format=esm --platform=node --target=node20 && tsc src/vite/annotate-source.ts --declaration --emitDeclarationOnly --outDir dist --module esnext --moduleResolution bundler --target es2020 --types node --skipLibCheck && mv dist/annotate-source.d.ts dist/vite.d.ts"
   },
   "keywords": [
     "react",
@@ -60,10 +67,12 @@
     }
   },
   "devDependencies": {
+    "@types/node": "^22.20.1",
     "@types/react": "^18.3.24",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^5.1.1",
     "@zumer/snapdom": "^2.24.7",
+    "esbuild": "^0.28.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "~5.8.3",

@@ -169,6 +169,13 @@
 .ra-canvas-stage img { display: block; max-width: 100%; max-height: calc(90vh - 120px); }
 .ra-canvas-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
 .ra-noshot { padding: 40px; color: var(--ra-fg-soft); text-align: center; }
+.ra-snippet__more > summary {
+  cursor: pointer;
+  color: var(--ra-fg-soft);
+  font-size: 11px;
+  padding: 2px 0;
+  user-select: none;
+}
 .ra-snippet-wrap {
   flex: 0 0 auto;
   max-height: 180px;

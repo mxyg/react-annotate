@@ -138,11 +138,18 @@ const PinComposer: React.FC<PinComposerProps> = ({
           <div className="ra-canvas-wrap">
             <DrawSurface shotUrl={shotUrl} shapes={shapes} onChange={setShapes} tool={tool} color={color} />
           </div>
+          {/* 源码位置放首位并默认展开，选择器与 DOM 片段收进折叠：
+              定位一个问题真正有用的是「哪个文件第几行」，一屏 div 嵌套只会淹没它 */}
           {(anchor.snippet || anchor.sourceLoc || anchor.selector) && (
             <div className="ra-snippet-wrap">
               {anchor.sourceLoc && <div className="ra-snippet__loc">{anchor.sourceLoc}</div>}
-              {anchor.selector && <div className="ra-snippet__sel">{anchor.selector}</div>}
-              {anchor.snippet && <pre className="ra-snippet">{anchor.snippet}</pre>}
+              {(anchor.selector || anchor.snippet) && (
+                <details className="ra-snippet__more">
+                  <summary>DOM 定位</summary>
+                  {anchor.selector && <div className="ra-snippet__sel">{anchor.selector}</div>}
+                  {anchor.snippet && <pre className="ra-snippet">{anchor.snippet}</pre>}
+                </details>
+              )}
             </div>
           )}
         </div>
