@@ -179,6 +179,18 @@ export function buildRegionAnchor(clip: { x: number; y: number; width: number; h
 }
 
 /**
+ * 生产构建注入的源码短 id：向上找最近一个带 `data-sl` 的节点。
+ *
+ * 它是**不可反解**的哈希（对照表只在服务端），所以不受 collectSource 开关限制——
+ * 发出去的只是一串 7 位字符，拿不到它就什么也不是；后台解析后才是真实文件行号。
+ * 这样「用户端不带路径」和「我们能一键定位」两件事才能同时成立。
+ */
+export function sourceRefOf(el: Element): string {
+  const holder = el.closest('[data-sl]');
+  return holder?.getAttribute('data-sl') || '';
+}
+
+/**
  * 由点击点与目标元素算出锚点数据。
  *
  * `collectSource=false` 时不采集 DOM 片段与源码位置：这两项只在开发/内部环境有意义
@@ -189,6 +201,7 @@ export function buildAnchor(el: Element, clientX: number, clientY: number, colle
   const url = `${window.location.pathname}${window.location.search}`;
   const snippet = collectSource ? htmlSnippet(el) : '';
   const sourceLoc = collectSource ? reactSourceLoc(el) : '';
+  const sourceRef = sourceRefOf(el);
   return {
     url,
     routePattern: toRoutePattern(url),
@@ -198,6 +211,7 @@ export function buildAnchor(el: Element, clientX: number, clientY: number, colle
     elementLabel: describeElement(el),
     snippet,
     sourceLoc,
+    sourceRef,
     viewport: {
       w: window.innerWidth,
       h: window.innerHeight,
@@ -205,6 +219,7 @@ export function buildAnchor(el: Element, clientX: number, clientY: number, colle
       theme: document.documentElement.getAttribute('data-theme') || undefined,
       snippet,
       sourceLoc,
+      sourceRef,
     },
   };
 }

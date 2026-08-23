@@ -26,11 +26,13 @@ export interface PinAnchor {
   anchorX: number;
   anchorY: number;
   elementLabel: string;
+  /** 生产构建注入的源码短 id：不可反解，需服务端对照表才能还原成文件行号 */
+  sourceRef?: string;
   /** 选中节点的精简 outerHTML，和截图一起用来对源码 */
   snippet?: string;
   /** React 组件源码位置（开发态 fiber._debugSource），例如 Poincare/src/foo.tsx:128 */
   sourceLoc?: string;
-  viewport: { w: number; h: number; dpr: number; theme?: string; snippet?: string; sourceLoc?: string };
+  viewport: { w: number; h: number; dpr: number; theme?: string; snippet?: string; sourceLoc?: string; sourceRef?: string };
 }
 
 export interface AnnotationPin extends PinAnchor {
