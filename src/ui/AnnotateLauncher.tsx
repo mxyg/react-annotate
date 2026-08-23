@@ -18,6 +18,11 @@ export interface AnnotateLauncherProps {
   hotkey?: string | null;
   /** 是否显示右下角浮动按钮 */
   fab?: boolean;
+  /**
+   * 外部触发标注：每次数值变化即进入「选元素」阶段。
+   * 用数值而不是布尔，是为了让「再点一次」也能重新触发，不必先复位。
+   */
+  openSignal?: number;
   fabText?: string;
   /** 打开已有标注（宿主通常跳看板详情） */
   onOpenPin?: (pin: AnnotationPin) => void;
@@ -29,6 +34,7 @@ type Stage = 'idle' | 'picking' | 'shooting' | 'composing';
 const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
   hotkey = 'alt+a',
   fab = true,
+  openSignal,
   fabText = '标注',
   onOpenPin,
   onSubmitted,
@@ -74,6 +80,17 @@ const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
     },
     [shoot],
   );
+
+  // 外部入口（如「联系我们」页的「圈选问题」按钮）触发
+  const firstSignal = useRef(true);
+  useEffect(() => {
+    if (openSignal === undefined) return;
+    if (firstSignal.current) {
+      firstSignal.current = false;
+      return;
+    }
+    setStage((s) => (s === 'idle' ? 'picking' : s));
+  }, [openSignal]);
 
   useEffect(() => {
     if (!hotkey) return;
