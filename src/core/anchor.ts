@@ -82,11 +82,32 @@ export function resolveSelector(selector: string): HTMLElement | null {
 /** 元素的人话描述：选择器失效后，这是人工找回现场的唯一线索 */
 export function describeElement(el: Element): string {
   const tag = el.tagName.toLowerCase();
-  const aria = el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder');
-  const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
-  const label = aria || text;
-  return label ? `${label.slice(0, 60)}（${tag}）` : tag;
+  const clean = (v?: string | null) => (v || '').replace(/\s+/g, ' ').trim();
+
+  // 顺序是刻意的：显式无障碍标签 > 自身直接文本 > 后代文本。
+  // 直接用 textContent 的话，点中一个容器 div 会把满屏子孙的文字全抄一遍
+  // （「当前版本v34最新版本v34待更新任务0…」），既当不成标题也读不成位置。
+  const explicit = clean(
+    el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') || el.getAttribute('alt'),
+  );
+  const own = clean(
+    [...el.childNodes]
+      .filter((n) => n.nodeType === 3)
+      .map((n) => n.textContent || '')
+      .join(' '),
+  );
+  const descendant = clean(el.textContent);
+
+  const label = explicit || own || descendant;
+  if (!label) return tag;
+
+  const MAX = 24;
+  // 取自后代文本说明点中的是容器，标出来免得当成按钮本身的名字
+  const isContainer = !explicit && !own && descendant.length > MAX;
+  const short = label.length > MAX ? `${label.slice(0, MAX)}…` : label;
+  return isContainer ? `${short}（${tag} 区域）` : `${short}（${tag}）`;
 }
+
 
 /** 精简 outerHTML：去掉脚本/内联大图，方便和截图一起贴进卡片 */
 export function htmlSnippet(el: Element, max = 1800): string {
