@@ -88,6 +88,62 @@ export function describeElement(el: Element): string {
   return label ? `${label.slice(0, 60)}（${tag}）` : tag;
 }
 
+/** 精简 outerHTML：去掉脚本/内联大图，方便和截图一起贴进卡片 */
+export function htmlSnippet(el: Element, max = 1800): string {
+  const clone = el.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll('script, style').forEach((n) => n.remove());
+  clone.querySelectorAll('svg, canvas, video').forEach((n) => {
+    n.replaceWith(clone.ownerDocument.createComment(n.tagName.toLowerCase()));
+  });
+  clone.querySelectorAll('img').forEach((img) => {
+    const src = img.getAttribute('src') || '';
+    if (src.startsWith('data:') || src.length > 80) img.setAttribute('src', '…');
+  });
+  const walk = (n: Element) => {
+    [...n.attributes].forEach((a) => {
+      if ((a.name === 'style' || a.name.startsWith('data-react')) && a.value.length > 80) {
+        n.removeAttribute(a.name);
+      }
+    });
+    [...n.children].forEach(walk);
+  };
+  walk(clone);
+  const extra = [...clone.children];
+  if (extra.length > 6) {
+    extra.slice(6).forEach((c) => c.remove());
+    clone.append('…');
+  }
+  let html = (clone.outerHTML || '').replace(/\s+/g, ' ').trim();
+  if (html.length > max) html = `${html.slice(0, max)}…`;
+  return html;
+}
+
+/** 开发态沿 React fiber 往上找 _debugSource，生产包通常没有 */
+export function reactSourceLoc(el: Element): string {
+  const fiberKey = Object.keys(el).find(
+    (k) => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'),
+  );
+  if (!fiberKey) return '';
+  let fiber: { return?: unknown; type?: unknown; _debugSource?: { fileName?: string; lineNumber?: number; columnNumber?: number } } | undefined = (
+    el as unknown as Record<string, typeof fiber>
+  )[fiberKey];
+  const names: string[] = [];
+  for (let i = 0; i < 40 && fiber; i += 1, fiber = fiber.return as typeof fiber) {
+    const t = fiber.type;
+    const name = typeof t === 'string' ? t : (t as { displayName?: string; name?: string } | undefined)?.displayName || (t as { name?: string } | undefined)?.name;
+    if (name && name !== 'Anonymous' && names.length < 4 && !names.includes(name)) names.push(name);
+    const src = fiber._debugSource;
+    if (src?.fileName) {
+      const file = String(src.fileName).replace(/^.*?(\/Poincare\/|\/Shannon\/|\/src\/)/, (_, m: string) =>
+        m.includes('Poincare') ? 'Poincare/' : m.includes('Shannon') ? 'Shannon/' : 'src/',
+      );
+      const loc = `${file}:${src.lineNumber}${src.columnNumber ? `:${src.columnNumber}` : ''}`;
+      return names.length ? `${names.join(' < ')}  @ ${loc}` : loc;
+    }
+  }
+  return names.length ? names.join(' < ') : '';
+}
+
 /** 与后端 AnnotationService.toRoutePattern 保持同一套规则：uuid/数字/长 hash 段归一为 :id */
 export function toRoutePattern(url: string): string {
   const path = (url || '').split('?')[0].split('#')[0];
@@ -126,6 +182,8 @@ export function buildRegionAnchor(clip: { x: number; y: number; width: number; h
 export function buildAnchor(el: Element, clientX: number, clientY: number) {
   const rect = el.getBoundingClientRect();
   const url = `${window.location.pathname}${window.location.search}`;
+  const snippet = htmlSnippet(el);
+  const sourceLoc = reactSourceLoc(el);
   return {
     url,
     routePattern: toRoutePattern(url),
@@ -133,11 +191,15 @@ export function buildAnchor(el: Element, clientX: number, clientY: number) {
     anchorX: rect.width ? Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) : 0.5,
     anchorY: rect.height ? Math.min(1, Math.max(0, (clientY - rect.top) / rect.height)) : 0.5,
     elementLabel: describeElement(el),
+    snippet,
+    sourceLoc,
     viewport: {
       w: window.innerWidth,
       h: window.innerHeight,
       dpr: window.devicePixelRatio || 1,
       theme: document.documentElement.getAttribute('data-theme') || undefined,
+      snippet,
+      sourceLoc,
     },
   };
 }

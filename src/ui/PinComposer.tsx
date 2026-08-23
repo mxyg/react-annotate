@@ -35,6 +35,10 @@ export interface PinComposerProps {
   onRecapture?: () => void;
   onSubmit: (draft: PinDraft) => void;
   onCancel: () => void;
+  /** 主按钮文案；默认「加入看板」。联系我们圈选应改成「添加到这条反馈」 */
+  submitLabel?: string;
+  /** 覆盖默认说明。不传则提示「重复提交会计入已有卡」 */
+  hint?: string;
 }
 
 const PinComposer: React.FC<PinComposerProps> = ({
@@ -48,6 +52,8 @@ const PinComposer: React.FC<PinComposerProps> = ({
   onRecapture,
   onSubmit,
   onCancel,
+  submitLabel,
+  hint,
 }) => {
   // 标题默认取选中元素描述——用户想改随时改，但空标题的卡片在看板里没法认
   const [title, setTitle] = useState(() => anchor.elementLabel.replace(/（[^）]*）$/, '').slice(0, 60));
@@ -132,6 +138,13 @@ const PinComposer: React.FC<PinComposerProps> = ({
           <div className="ra-canvas-wrap">
             <DrawSurface shotUrl={shotUrl} shapes={shapes} onChange={setShapes} tool={tool} color={color} />
           </div>
+          {(anchor.snippet || anchor.sourceLoc || anchor.selector) && (
+            <div className="ra-snippet-wrap">
+              {anchor.sourceLoc && <div className="ra-snippet__loc">{anchor.sourceLoc}</div>}
+              {anchor.selector && <div className="ra-snippet__sel">{anchor.selector}</div>}
+              {anchor.snippet && <pre className="ra-snippet">{anchor.snippet}</pre>}
+            </div>
+          )}
         </div>
 
         <div className="ra-panel__right">
@@ -185,13 +198,13 @@ const PinComposer: React.FC<PinComposerProps> = ({
               <br />
               位置：{anchor.routePattern} · {anchor.elementLabel}
               <br />
-              同一处界面或同一段描述再次提交时，会计入已有卡片的次数，不会再开一张卡。
+              {hint || '同一处界面或同一段描述再次提交时，会计入已有卡片的次数，不会再开一张卡。'}
             </div>
           </div>
           <div className="ra-actions">
             <button type="button" className="ra-btn" onClick={onCancel}>取消</button>
             <button type="button" className="ra-btn ra-btn--primary" disabled={submitting} onClick={submit}>
-              {submitting ? '提交中…' : '加入看板'}
+              {submitting ? '提交中…' : submitLabel || '加入看板'}
             </button>
           </div>
         </div>

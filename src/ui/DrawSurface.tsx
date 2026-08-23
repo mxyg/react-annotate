@@ -80,7 +80,11 @@ const DrawSurface: React.FC<DrawSurfaceProps> = ({
 
   return (
     <div className="ra-canvas-stage">
-      {shotUrl ? <img src={shotUrl} alt="标注截图" draggable={false} /> : <div className="ra-noshot">（无截图，仅记录元素位置）</div>}
+      {shotUrl ? <img src={shotUrl} alt="标注截图" draggable={false} /> : <div className="ra-noshot">
+          没截到画面，只记录了元素位置。
+          <br />
+          （页面内容还没渲染完时会这样，可点右上角「重新截图」再试一次）
+        </div>}
       <svg
         ref={svgRef}
         viewBox={`0 0 ${S} ${S}`}

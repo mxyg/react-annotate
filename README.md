@@ -60,6 +60,15 @@ import { AnnotationBoard } from '@liuman/react-annotate';
 <AnnotationBoard pins={pins} onMove={(pin, status) => save(pin.id, { status })} onOpen={openDetail} />;
 ```
 
+联系我们这类「只要截图、不要进看板」的场景：
+
+```tsx
+<AnnotateLauncher
+  submitKind="collect"
+  onCollected={(draft) => attachToTicket(draft.shotUrl, draft)}
+/>
+```
+
 `createPin` 若命中已有问题，应返回那张卡并带 `merged: true`、`reportCount` 为累加后的次数，而不是新建。
 
 去重键：

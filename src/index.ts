@@ -20,15 +20,16 @@ export { default as DrawSurface, DRAW_COLORS } from './ui/DrawSurface';
 export { default as AnnotationBoard, BOARD_COLUMNS } from './ui/AnnotationBoard';
 export type { AnnotationBoardProps } from './ui/AnnotationBoard';
 
-export { buildAnchor, buildRegionAnchor, buildSelector, resolveSelector, describeElement, toRoutePattern } from './core/anchor';
+export { buildAnchor, buildRegionAnchor, buildSelector, resolveSelector, describeElement, htmlSnippet, reactSourceLoc, toRoutePattern } from './core/anchor';
 export { buildDupKey, normalizeIssueText } from './core/dup';
 export type { DupKeyInput } from './core/dup';
-export { captureToBlob, isCaptureAvailable } from './core/capture';
+export { captureToBlob, isCaptureAvailable, afterPaint, clipFromElement, viewportClip } from './core/capture';
 export type { CaptureOptions, CaptureClip } from './core/capture';
 
 export type {
   AnnotateAdapter,
   AnnotateMode,
+  AnnotateSubmitKind,
   AnnotationPin,
   AssignableUser,
   DrawShape,

@@ -26,7 +26,11 @@ export interface PinAnchor {
   anchorX: number;
   anchorY: number;
   elementLabel: string;
-  viewport: { w: number; h: number; dpr: number; theme?: string };
+  /** 选中节点的精简 outerHTML，和截图一起用来对源码 */
+  snippet?: string;
+  /** React 组件源码位置（开发态 fiber._debugSource），例如 Poincare/src/foo.tsx:128 */
+  sourceLoc?: string;
+  viewport: { w: number; h: number; dpr: number; theme?: string; snippet?: string; sourceLoc?: string };
 }
 
 export interface AnnotationPin extends PinAnchor {
@@ -91,7 +95,19 @@ export interface AnnotateAdapter {
   listAssignees?(): Promise<AssignableUser[]>;
   /** 当前标注人，用于「默认是谁标注」 */
   currentUser?: { id?: string; name?: string } | null;
+  /**
+   * 截 DOM 之后、盖 canvas 像素之前调用。三维 WebGL 必须先 render 一帧，
+   * 否则未开 preserveDrawingBuffer 时盖上去是空白。
+   */
+  prepareCapture?: () => void;
 }
 
 /** full=内部标注（可指派/定优先级/定时间）；feedback=用户反馈（只填问题描述） */
 export type AnnotateMode = 'full' | 'feedback';
+
+/**
+ * 提交去向：
+ * - pin：走 adapter.createPin，进看板
+ * - collect：不建卡，把截图+锚点+说明交回宿主（联系我们把证据贴进工单）
+ */
+export type AnnotateSubmitKind = 'pin' | 'collect';
