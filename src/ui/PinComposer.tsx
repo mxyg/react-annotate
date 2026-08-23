@@ -39,6 +39,27 @@ export interface PinComposerProps {
   submitLabel?: string;
   /** 覆盖默认说明。不传则提示「重复提交会计入已有卡」 */
   hint?: string;
+  /** 默认指派人；通常传当前登录人——自己标的默认自己认领 */
+  defaultAssigneeId?: string;
+  /** 默认期望完成的天数（从今天算起），默认 3 天 */
+  defaultDueInDays?: number;
+}
+
+/** 今天 +n 天的 `YYYY-MM-DD`（date input 只认这个格式；按本地时区算，别用 toISOString） */
+function dateAfter(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** 用页面路由末段当默认标签：看板按页面归类时最常用的就是它 */
+function defaultLabelOf(routePattern: string): string {
+  const seg = (routePattern || '')
+    .split('/')
+    .filter((x) => x && x !== ':id')
+    .pop();
+  return seg || '';
 }
 
 const PinComposer: React.FC<PinComposerProps> = ({
@@ -54,14 +75,18 @@ const PinComposer: React.FC<PinComposerProps> = ({
   onCancel,
   submitLabel,
   hint,
+  defaultAssigneeId,
+  defaultDueInDays = 3,
 }) => {
   // 标题默认取选中元素描述——用户想改随时改，但空标题的卡片在看板里没法认
   const [title, setTitle] = useState(() => anchor.elementLabel.replace(/（[^）]*）$/, '').slice(0, 60));
   const [body, setBody] = useState('');
   const [priority, setPriority] = useState<PinPriority>('NORMAL');
-  const [dueAt, setDueAt] = useState('');
-  const [assigneeId, setAssigneeId] = useState('');
-  const [labelText, setLabelText] = useState('');
+  // 能推出来的字段一律先填好：标一处问题的人多半只想写清「要改什么」，
+  // 剩下的优先级、时间、谁做每次都从零选一遍，纯属摩擦。填错了随时改。
+  const [dueAt, setDueAt] = useState(() => dateAfter(defaultDueInDays));
+  const [assigneeId, setAssigneeId] = useState(defaultAssigneeId || '');
+  const [labelText, setLabelText] = useState(() => defaultLabelOf(anchor.routePattern));
   const [shapes, setShapes] = useState<DrawShape[]>([]);
   const [tool, setTool] = useState<DrawShape['type']>('pen');
   const [color, setColor] = useState(DRAW_COLORS[0]);
@@ -74,6 +99,12 @@ const PinComposer: React.FC<PinComposerProps> = ({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
+
+  /** 候选里没有当前登录人时补一条：否则默认指派给自己会显示成空选项 */
+  const assigneeOptions = useMemo(() => {
+    if (!defaultAssigneeId || assignees.some((a) => a.id === defaultAssigneeId)) return assignees;
+    return [{ id: defaultAssigneeId, name: authorName || '我' }, ...assignees];
+  }, [assignees, defaultAssigneeId, authorName]);
 
   const labels = useMemo(
     () => labelText.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean),
@@ -188,7 +219,7 @@ const PinComposer: React.FC<PinComposerProps> = ({
                   <label>谁来做</label>
                   <select className="ra-select" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}>
                     <option value="">暂不指派</option>
-                    {assignees.map((a) => (
+                    {assigneeOptions.map((a) => (
                       <option key={a.id} value={a.id}>{a.name || a.email || a.id}</option>
                     ))}
                   </select>

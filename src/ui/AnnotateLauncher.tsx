@@ -201,6 +201,8 @@ const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
           shotKey={shot?.key}
           mode={submitKind === 'collect' ? 'feedback' : mode}
           authorName={adapter.currentUser?.name}
+          /* 自己标的默认自己认领：绝大多数标注就是标注人自己去改 */
+          defaultAssigneeId={adapter.currentUser?.id}
           assignees={assignees}
           submitting={submitting}
           submitLabel={submitKind === 'collect' ? '添加到这条反馈' : undefined}
