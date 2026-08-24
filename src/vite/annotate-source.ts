@@ -17,6 +17,32 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
+/**
+ * 只给**真正的 HTML/SVG 标签**注入属性。
+ *
+ * 不能简单按「小写 JSX 就是宿主元素」判断：react-three-fiber 把 `<mesh>`、`<group>`、
+ * `<bufferGeometry>` 这类小写 JSX 当成 three.js 对象，它的 applyProps 会按 `-` 拆键
+ * 去写 `instance.data.sl`，属性一带上整棵三维场景就崩
+ * （`Cannot read properties of undefined (reading 'sl')`）。
+ * 同类风险还有任何把小写标签当自定义渲染器指令的库，所以这里用白名单而不是黑名单。
+ */
+const HTML_TAGS = new Set(
+  ('a abbr address area article aside audio b base bdi bdo big blockquote body br button canvas caption cite code col ' +
+    'colgroup data datalist dd del details dfn dialog div dl dt em embed fieldset figcaption figure footer form h1 h2 ' +
+    'h3 h4 h5 h6 head header hgroup hr html i iframe img input ins kbd keygen label legend li link main map mark menu ' +
+    'menuitem meta meter nav noscript object ol optgroup option output p param picture pre progress q rp rt ruby s ' +
+    'samp script section select slot small source span strong style sub summary sup table tbody td template textarea ' +
+    'tfoot th thead time title tr track u ul var video wbr').split(' '),
+);
+const SVG_TAGS = new Set(
+  ('svg animate animateMotion animateTransform circle clipPath defs desc ellipse feBlend feColorMatrix ' +
+    'feComponentTransfer feComposite feConvolveMatrix feDiffuseLighting feDisplacementMap feDistantLight feDropShadow ' +
+    'feFlood feFuncA feFuncB feFuncG feFuncR feGaussianBlur feImage feMerge feMergeNode feMorphology feOffset ' +
+    'fePointLight feSpecularLighting feSpotLight feTile feTurbulence filter foreignObject g image line linearGradient ' +
+    'marker mask metadata mpath path pattern polygon polyline radialGradient rect stop switch symbol text textPath ' +
+    'tspan use view').split(' '),
+);
+
 /** FNV-1a：够稳、够短；没有对照表在手就是一串废字符，反解不出任何东西 */
 export function shortSourceHash(input: string): string {
   let h = 0x811c9dc5;
@@ -49,6 +75,8 @@ export interface AnnotateSourceOptions {
   enabled?: boolean;
   /** 版本号，写进产物便于核对前后端是否配套 */
   version?: string;
+  /** 额外放行的标签名（默认只认 HTML/SVG 标准标签，见 HTML_TAGS/SVG_TAGS 注释） */
+  extraTags?: string[];
 }
 
 /**
@@ -68,6 +96,7 @@ export function createAnnotateSource(options: AnnotateSourceOptions) {
   const manifestFile =
     options.manifestFile || path.resolve(root, 'build-artifacts/annotate-source-manifest.json');
   const map = new Map<string, string>();
+  const extraTags = new Set(options.extraTags || []);
   let isBuild = false;
   let dirty = false;
   let devTimer: ReturnType<typeof setTimeout> | null = null;
@@ -78,8 +107,11 @@ export function createAnnotateSource(options: AnnotateSourceOptions) {
       JSXOpeningElement(nodePath: any, state: any) {
         if (!enabled) return;
         const name = nodePath.node.name;
-        // 只标宿主元素（小写标签）：DOM 上出现的就是它们；组件元素标了也落不到节点上，白占体积
-        if (name?.type !== 'JSXIdentifier' || !/^[a-z]/.test(name.name)) return;
+        // 只标真正会落到 DOM 上的 HTML/SVG 标签。组件元素标了也落不到节点上；
+        // 而 three.js 这类自定义渲染器的小写标签标了会直接把页面搞崩（见 HTML_TAGS 注释）
+        if (name?.type !== 'JSXIdentifier') return;
+        const tag: string = name.name;
+        if (!HTML_TAGS.has(tag) && !SVG_TAGS.has(tag) && !extraTags.has(tag)) return;
         const attrs = nodePath.node.attributes || [];
         if (attrs.some((a: any) => a.type === 'JSXAttribute' && a.name?.name === 'data-sl')) return;
 
