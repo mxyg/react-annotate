@@ -77,6 +77,12 @@ export interface AnnotateSourceOptions {
   version?: string;
   /** 额外放行的标签名（默认只认 HTML/SVG 标准标签，见 HTML_TAGS/SVG_TAGS 注释） */
   extraTags?: string[];
+  /**
+   * 引了这些模块的文件整份跳过注入。默认 three / @react-three/*。
+   * 白名单挡不住**重名**：`line`、`text`、`image`、`audio`、`view` 既是 SVG 标签，
+   * 也是 three.js 元素名，光看标签名分不出来。所以再按「这个文件是不是三维文件」兜一道。
+   */
+  skipModules?: (string | RegExp)[];
 }
 
 /**
@@ -97,6 +103,9 @@ export function createAnnotateSource(options: AnnotateSourceOptions) {
     options.manifestFile || path.resolve(root, 'build-artifacts/annotate-source-manifest.json');
   const map = new Map<string, string>();
   const extraTags = new Set(options.extraTags || []);
+  const skipModules = options.skipModules ?? [/^three($|\/)/, /^@react-three\//];
+  const shouldSkipSource = (src: string) =>
+    skipModules.some((m) => (typeof m === 'string' ? src === m || src.startsWith(`${m}/`) : m.test(src)));
   let isBuild = false;
   let dirty = false;
   let devTimer: ReturnType<typeof setTimeout> | null = null;
@@ -104,8 +113,14 @@ export function createAnnotateSource(options: AnnotateSourceOptions) {
   const babelPlugin = ({ types: t }: { types: any }) => ({
     name: 'annotate-source-id',
     visitor: {
+      Program(programPath: any, state: any) {
+        // 整份跳过三维文件：见 skipModules 注释
+        state.__annotateSkipFile = programPath.node.body.some(
+          (n: any) => n.type === 'ImportDeclaration' && shouldSkipSource(String(n.source?.value || '')),
+        );
+      },
       JSXOpeningElement(nodePath: any, state: any) {
-        if (!enabled) return;
+        if (!enabled || state.__annotateSkipFile) return;
         const name = nodePath.node.name;
         // 只标真正会落到 DOM 上的 HTML/SVG 标签。组件元素标了也落不到节点上；
         // 而 three.js 这类自定义渲染器的小写标签标了会直接把页面搞崩（见 HTML_TAGS 注释）
