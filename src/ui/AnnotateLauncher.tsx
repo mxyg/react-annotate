@@ -58,17 +58,23 @@ const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
   const { adapter, mode, collectSource, pins, assignees, onCreated } = useAnnotate();
   const [stage, setStage] = useState<Stage>('idle');
   const [anchor, setAnchor] = useState<PinAnchor | null>(null);
-  const [shot, setShot] = useState<{ url: string; key: string } | null>(null);
   const [localShotUrl, setLocalShotUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const objectUrl = useRef<string | null>(null);
+  /**
+   * 截图内容只留在内存里，**提交时才上传**。
+   * 截完就传的话，用户点「取消」这张图已经躺在对象存储里了，而且 DB 里连一行记录都没有——
+   * 事后既查不出它属于谁，也没有任何东西会去删它，纯粹的孤儿文件。
+   * 「重新截图」同理：旧 blob 直接被覆盖，不会在存储里留下上一张。
+   */
+  const shotBlob = useRef<Blob | null>(null);
   const lastClip = useRef<CaptureOptions['clip']>('viewport');
 
   const cleanup = useCallback(() => {
     if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
     objectUrl.current = null;
+    shotBlob.current = null;
     setLocalShotUrl(null);
-    setShot(null);
     setAnchor(null);
     setStage('idle');
   }, []);
@@ -89,16 +95,13 @@ const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
       new Promise<null>((resolve) => window.setTimeout(() => resolve(null), CAPTURE_TIMEOUT_MS)),
     ]).catch(() => null);
     if (blob) {
+      if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
       objectUrl.current = URL.createObjectURL(blob);
+      shotBlob.current = blob;
       setLocalShotUrl(objectUrl.current);
-      try {
-        setShot(await adapter.uploadShot(blob));
-      } catch {
-        setShot(null);
-      }
     }
     setStage('composing');
-  }, [adapter]);
+  }, []);
 
   const onPick = useCallback(
     (r: PickResult) => {
@@ -156,15 +159,33 @@ const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
     return () => window.removeEventListener('keydown', onKey, true);
   }, [hotkey]);
 
-  const submit = async (draft: PinDraft) => {
-    const packed: PinDraft = { ...draft, shotUrl: shot?.url || null, shotKey: shot?.key || null };
-    if (submitKind === 'collect') {
-      onCollected?.(packed);
-      cleanup();
-      return;
+  /**
+   * 提交时才把截图落到存储。上传失败不阻断提交——
+   * 卡片本身（位置、描述、指派）远比那张图重要，丢图总好过整条标注提交不上去。
+   */
+  const uploadShotNow = async (): Promise<{ url: string; key: string } | null> => {
+    if (!shotBlob.current) return null;
+    try {
+      return await adapter.uploadShot(shotBlob.current);
+    } catch {
+      return null;
     }
+  };
+
+  const submit = async (draft: PinDraft) => {
     setSubmitting(true);
     try {
+      const uploaded = await uploadShotNow();
+      const packed: PinDraft = {
+        ...draft,
+        shotUrl: uploaded?.url || null,
+        shotKey: uploaded?.key || null,
+      };
+      if (submitKind === 'collect') {
+        onCollected?.(packed);
+        cleanup();
+        return;
+      }
       const pin = await adapter.createPin(packed);
       onCreated(pin);
       onSubmitted?.(pin);
@@ -176,6 +197,22 @@ const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
 
   // composing 却没有锚点，会渲染出「什么都没有」——浮动按钮、气泡、编辑器全不见且退不出去。
   // 与其相信状态一定成对，不如在这里兜底当成空闲。
+  /**
+   * 圈选/编辑进行中时给 <html> 打一个标记。
+   *
+   * 别的组件需要知道"标注正在进行"来避让——典型的是浮动窗口：圈选那一下会被当成"按住标题栏"，
+   * 窗口跟着被拖跑，截出来的证据还是一张半透明的窗口。
+   * 从前它们只能判断 `[data-annotate-layer]` 是否存在，但常驻的 FAB 按钮也带这个属性，
+   * 于是"标注进行中"永远为真——窗口**永久拖不动**（2026-08-25 实测到的真实故障）。
+   * 所以这里给出一个只在**进行中**才存在的标记，避让方按它判断。
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    if (stage === 'idle') root.removeAttribute('data-annotate-active');
+    else root.setAttribute('data-annotate-active', stage);
+    return () => root.removeAttribute('data-annotate-active');
+  }, [stage]);
+
   const view: Stage = stage === 'composing' && !anchor ? 'idle' : stage;
 
   return (
@@ -198,7 +235,6 @@ const AnnotateLauncher: React.FC<AnnotateLauncherProps> = ({
         <PinComposer
           anchor={anchor}
           shotUrl={localShotUrl}
-          shotKey={shot?.key}
           mode={submitKind === 'collect' ? 'feedback' : mode}
           authorName={adapter.currentUser?.name}
           /* 自己标的默认自己认领：绝大多数标注就是标注人自己去改 */

@@ -43,6 +43,28 @@ const SVG_TAGS = new Set(
     'tspan use view').split(' '),
 );
 
+/**
+ * **与 three.js 命名空间重名的 DOM 标签**——一律不注入。
+ *
+ * 白名单只解决了「`<mesh>` 这种一看就不是 DOM 的标签」，但下面这几个是真重名：
+ * DOM 里它们是合法标签，three 里同时存在同名类，于是 react-three-fiber 也认它们。
+ *   line   → SVG 直线 / THREE.Line
+ *   path   → SVG 路径 / THREE.Path
+ *   audio  → HTML 音频 / THREE.Audio
+ *   source → HTML 媒体源 / THREE.Source（r152+ 的贴图源）
+ *
+ * 整份文件跳过（skipModules）只在文件直接 import 了 three/@react-three 时才生效，
+ * 而 `<line><bufferGeometry /><lineBasicMaterial /></line>` 这种写法**一个 import 都不需要**，
+ * 于是漏进白名单、注入 `data-sl`、R3F 按 `-` 拆键写 `instance.data.sl` → 整棵场景崩
+ * （`Cannot read properties of undefined (reading 'sl')`，且 Canvas 下每个元素各报一次，
+ * 控制台刷屏几十条 "The above error occurred in the <xxx> component"）。
+ *
+ * 代价很小：运行时取 id 用的是 `el.closest('[data-sl]')`（向上找最近的祖先），
+ * 所以点中一个 SVG 图标的 `<path>` 会回退到外层 `<svg>`——损失的只是"精确到 path 那一行"。
+ * 确定项目里不用三维、想把它们要回来，用 `extraTags: ['path', 'line']` 显式覆盖。
+ */
+const THREE_CONFLICT_TAGS = new Set(['line', 'path', 'audio', 'source']);
+
 /** FNV-1a：够稳、够短；没有对照表在手就是一串废字符，反解不出任何东西 */
 export function shortSourceHash(input: string): string {
   let h = 0x811c9dc5;
@@ -110,7 +132,24 @@ export function createAnnotateSource(options: AnnotateSourceOptions) {
   let dirty = false;
   let devTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const babelPlugin = ({ types: t }: { types: any }) => ({
+  /**
+ * 该 JSX 元素是否位于 `<Canvas>`（react-three-fiber 根组件）子树内。
+ *
+ * Canvas 里的一切都交给 three 的自定义渲染器，小写标签是 three 对象而不是 DOM 节点，
+ * 注入 `data-sl` 会让 R3F 按 `-` 拆键去写 `instance.data.sl`，整棵场景当场崩。
+ * 只跳这棵子树，Canvas 外的 DOM 不受影响。
+ */
+const isInsideCanvasSubtree = (nodePath: any): boolean =>
+  Boolean(
+    nodePath.findParent(
+      (p: any) =>
+        p.isJSXElement?.() &&
+        p.node.openingElement?.name?.type === 'JSXIdentifier' &&
+        p.node.openingElement.name.name === 'Canvas',
+    ),
+  );
+
+const babelPlugin = ({ types: t }: { types: any }) => ({
     name: 'annotate-source-id',
     visitor: {
       Program(programPath: any, state: any) {
@@ -127,6 +166,12 @@ export function createAnnotateSource(options: AnnotateSourceOptions) {
         if (name?.type !== 'JSXIdentifier') return;
         const tag: string = name.name;
         if (!HTML_TAGS.has(tag) && !SVG_TAGS.has(tag) && !extraTags.has(tag)) return;
+        // 与 three 重名的标签一律跳过，除非调用方在 extraTags 里显式要回去
+        if (THREE_CONFLICT_TAGS.has(tag) && !extraTags.has(tag)) return;
+        // 只跳过 <Canvas> **子树内**的元素：同一文件里 Canvas 外的普通 DOM 照常标记。
+        // 早期版本是「文件里出现 Canvas 就整份跳过」，那样会把页面里大量可圈选的 DOM 一起牺牲掉。
+        if (isInsideCanvasSubtree(nodePath)) return;
+
         const attrs = nodePath.node.attributes || [];
         if (attrs.some((a: any) => a.type === 'JSXAttribute' && a.name?.name === 'data-sl')) return;
 
