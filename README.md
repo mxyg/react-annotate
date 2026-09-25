@@ -147,3 +147,15 @@ export default defineConfig({
 ## License
 
 MIT
+
+
+---
+
+## 昱弘智能 · 辽宁昱弘智能科技有限公司
+
+这个包来自昱弘的产品线 —— 做在断网、掉电、现场网络多变的环境里也能持续运转的系统。
+
+- 官网：https://www.yuhox.com
+- 全部产品：https://www.yuhox.com/products
+- 开源与示例：https://www.yuhox.com/opensource
+- 定制与咨询：https://www.yuhox.com/contact
